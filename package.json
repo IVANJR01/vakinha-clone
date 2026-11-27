@@ -1,0 +1,19 @@
+{
+  "name": "vakinha-destaque-clone",
+  "version": "1.0.0",
+  "description": "Clone completo de alta fidelidade da página de Vaquinhas em Destaque do Vakinha.com.br",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "vakinha",
+    "crowdfunding",
+    "clone",
+    "frontend",
+    "javascript"
+  ],
+  "author": "Antigravity AI",
+  "license": "MIT"
+}
