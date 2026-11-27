@@ -209,81 +209,252 @@
     </div>
   </div>
 
-  <!-- Modal de Doação Rápida / Checkout Pix -->
+  <!-- Modal de Doação / Checkout Integrado VizionPay -->
   <div class="modal-overlay" id="donationModal">
-    <div class="modal-content" style="max-width:500px;">
-      <button class="modal-close-btn" aria-label="Fechar">✕</button>
-      <div class="modal-body">
-        <div style="text-align:center; margin-bottom:18px;">
-          <div style="font-size:32px; margin-bottom:4px;">💚</div>
-          <h2 id="donationModalTitle" style="font-size:20px; font-weight:800; margin:0 0 6px;">Apoiar Vaquinha</h2>
-          <p style="font-size:13px; color:#666; margin:0;">Faça a diferença com sua contribuição!</p>
+    <div class="modal-content vizionpay-checkout-modal" style="max-width:540px;">
+      <button class="modal-close-btn" id="donationModalCloseBtn" aria-label="Fechar">✕</button>
+      
+      <!-- Cabeçalho Oficial VizionPay -->
+      <div class="vizionpay-header">
+        <div class="vizionpay-brand-row">
+          <div class="vizionpay-brand">
+            <svg class="vizionpay-shield" width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L3 7V12C3 17.52 6.84 22.74 12 24C17.16 22.74 21 17.52 21 12V7L12 2Z" fill="#10B981" fill-opacity="0.18"/>
+              <path d="M12 2L3 7V12C3 17.52 6.84 22.74 12 24C17.16 22.74 21 17.52 21 12V7L12 2Z" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M9 12L11 14L15 10" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="vizionpay-name">Vizion<strong>Pay</strong></span>
+            <span class="vizionpay-tag">GATEWAY</span>
+          </div>
+          <span class="vizionpay-secure-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            Ambiente Seguro 256-bit
+          </span>
         </div>
 
-        <label style="font-size:13px; font-weight:700; color:#333; display:block; margin-bottom:8px;">
-          Escolha o valor da doação:
-        </label>
+        <div class="vizionpay-campaign-summary">
+          <img id="donationCampaignThumb" src="https://static.vakinha.com.br/static/v4/vaquinha_default.png?ims=700x410" alt="Vaquinha" />
+          <div class="vizionpay-campaign-meta">
+            <span class="label">Você está apoiando:</span>
+            <h3 id="donationModalTitle">Carregando...</h3>
+          </div>
+        </div>
+      </div>
 
-        <div class="donation-presets">
-          <button type="button" class="donation-preset-btn" data-val="25">R$ 25</button>
-          <button type="button" class="donation-preset-btn active" data-val="50">R$ 50</button>
-          <button type="button" class="donation-preset-btn" data-val="100">R$ 100</button>
-          <button type="button" class="donation-preset-btn" data-val="250">R$ 250</button>
+      <div class="modal-body" style="padding: 20px 24px;">
+        
+        <!-- ETAPA 1: Seleção de Valor, Método e Dados do Doador -->
+        <div id="vizionpayStep1">
+          <!-- Seletor de Valor -->
+          <div class="checkout-section">
+            <label class="checkout-label">1. Escolha quanto deseja doar:</label>
+            <div class="donation-presets">
+              <button type="button" class="donation-preset-btn" data-val="25">R$ 25</button>
+              <button type="button" class="donation-preset-btn active" data-val="50">R$ 50</button>
+              <button type="button" class="donation-preset-btn" data-val="100">R$ 100</button>
+              <button type="button" class="donation-preset-btn" data-val="250">R$ 250</button>
+            </div>
+            
+            <div class="custom-amount-wrapper">
+              <span class="currency-symbol">R$</span>
+              <input 
+                type="number" 
+                id="customAmountInput" 
+                min="5" 
+                step="5" 
+                value="50" 
+                placeholder="Outro valor..."
+              />
+            </div>
+          </div>
+
+          <!-- Métodos de Pagamento VizionPay -->
+          <div class="checkout-section">
+            <label class="checkout-label">2. Método de pagamento VizionPay:</label>
+            <div class="payment-methods-grid">
+              <label class="payment-method-card active" data-method="pix">
+                <input type="radio" name="paymentMethod" value="pix" checked />
+                <div class="method-icon-wrap">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="#00bdae">
+                    <path d="M12.001 2.25L4.5 9.75l7.501 7.5 7.499-7.5-7.499-7.5zm-5.303 7.5l5.303-5.304 5.303 5.304-5.303 5.303-5.303-5.303z"/>
+                    <path d="M12.001 17.25L7.5 21.75h9.002l-4.501-4.5z"/>
+                  </svg>
+                </div>
+                <div class="method-details">
+                  <div class="method-title-row">
+                    <strong>Pix Instantâneo</strong>
+                    <span class="badge-instant">D+0 Instantâneo</span>
+                  </div>
+                  <span class="method-sub">Aprovação em segundos via QR Code ou Copia e Cola</span>
+                </div>
+              </label>
+
+              <label class="payment-method-card" data-method="credit_card">
+                <input type="radio" name="paymentMethod" value="credit_card" />
+                <div class="method-icon-wrap">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                  </svg>
+                </div>
+                <div class="method-details">
+                  <div class="method-title-row">
+                    <strong>Cartão de Crédito</strong>
+                    <span class="badge-neutral">Até 12x</span>
+                  </div>
+                  <span class="method-sub">Visa, Mastercard, Elo, Hipercard</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Dados do Doador para Emissão da Cobrança -->
+          <div class="checkout-section">
+            <label class="checkout-label">3. Dados para emissão (obrigatório pelo Banco Central):</label>
+            <div class="payer-form-grid">
+              <div class="input-field-group">
+                <label for="payerName">Nome completo *</label>
+                <input type="text" id="payerName" placeholder="Ex: Maria da Silva" required />
+              </div>
+              <div class="input-field-group">
+                <label for="payerCpf">CPF *</label>
+                <input type="text" id="payerCpf" placeholder="000.000.000-00" maxlength="14" required />
+              </div>
+              <div class="input-field-group">
+                <label for="payerEmail">E-mail para comprovante *</label>
+                <input type="email" id="payerEmail" placeholder="seuemail@exemplo.com" required />
+              </div>
+              <div class="input-field-group">
+                <label for="payerPhone">Telefone / WhatsApp</label>
+                <input type="text" id="payerPhone" placeholder="(00) 00000-0000" maxlength="15" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Botão de Ação -->
+          <button type="button" class="btn-vizionpay-primary" id="btnProceedVizionpay">
+            <span class="btn-text">Prosseguir para Pagamento VizionPay</span>
+            <span class="btn-subtext" id="btnAmountPreview">Total: R$ 50,00</span>
+          </button>
+
+          <div class="vizionpay-footer-info">
+            🔒 Transação processada de forma 100% segura pelo gateway <strong>VizionPay</strong>.
+          </div>
         </div>
 
-        <div style="margin-bottom:16px;">
-          <label style="font-size:12px; font-weight:600; color:#666; display:block; margin-bottom:4px;">
-            Ou digite outro valor (R$):
-          </label>
-          <input 
-            type="number" 
-            id="customAmountInput" 
-            min="5" 
-            step="5" 
-            value="50" 
-            style="width:100%; padding:10px 14px; border:1px solid #ced4da; border-radius:8px; font-size:16px; font-weight:700; box-sizing:border-box;"
-          />
+        <!-- ETAPA 2: Exibição do QR Code Pix da VizionPay -->
+        <div id="vizionpayStepPix" style="display:none;">
+          <div class="pix-payment-box">
+            
+            <div class="status-pulse-bar">
+              <span class="pulse-dot"></span>
+              <span class="status-text" id="vizionpayStatusText">Aguardando pagamento no app do seu banco...</span>
+            </div>
+
+            <div class="pix-amount-badge">
+              <span>Valor da doação:</span>
+              <strong id="vizionpayCheckoutAmount">R$ 50,00</strong>
+            </div>
+
+            <!-- QR Code Real VizionPay -->
+            <div class="qr-code-display-wrap">
+              <div class="qr-code-frame">
+                <img id="vizionpayQrCodeImg" src="" alt="QR Code Pix VizionPay" />
+                <div class="qr-overlay-logo">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="#00bdae">
+                    <path d="M12.001 2.25L4.5 9.75l7.501 7.5 7.499-7.5-7.499-7.5zm-5.303 7.5l5.303-5.304 5.303 5.304-5.303 5.303-5.303-5.303z"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="pix-timer-row">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span>Este código expira em: <strong id="vizionpayCountdown">15:00</strong></span>
+              </div>
+            </div>
+
+            <!-- Código Pix Copia e Cola -->
+            <div class="pix-copia-cola-group">
+              <label>Código Pix Copia e Cola:</label>
+              <div class="pix-copy-input-row">
+                <input type="text" id="pixKeyInput" readonly value="" placeholder="Gerando código..." />
+                <button type="button" class="btn-copy-pix" id="copyPixBtn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span>Copiar</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Instruções Rápidas -->
+            <div class="pix-instructions">
+              <div class="instruction-step">
+                <span class="step-num">1</span>
+                <span>Abra o app do seu banco ou carteira digital</span>
+              </div>
+              <div class="instruction-step">
+                <span class="step-num">2</span>
+                <span>Escolha a opção <strong>Pix > Ler QR Code</strong> ou <strong>Pix Copia e Cola</strong></span>
+              </div>
+              <div class="instruction-step">
+                <span class="step-num">3</span>
+                <span>Confirme as informações e efetue a doação instantânea</span>
+              </div>
+            </div>
+
+            <!-- Ferramentas de Demonstração / Simulação e Voltar -->
+            <div class="checkout-actions-row">
+              <button type="button" class="btn-vizionpay-simulate" id="btnSimulateVizionpayPaid" title="Simular confirmação automática pelo Webhook da VizionPay">
+                ⚡ Simular Pagamento Instantâneo (VizionPay Test)
+              </button>
+              <button type="button" class="btn-vizionpay-back" id="btnBackToStep1">
+                ← Alterar valor ou dados
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="pix-qr-box">
-          <div style="display:inline-block; background:#fff; padding:12px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.06); margin-bottom:10px;">
-            <!-- Simulação visual de QR Code Pix -->
-            <svg width="140" height="140" viewBox="0 0 100 100" fill="#212529">
-              <rect x="0" y="0" width="30" height="30" fill="#212529"/>
-              <rect x="5" y="5" width="20" height="20" fill="#fff"/>
-              <rect x="10" y="10" width="10" height="10" fill="#212529"/>
-              
-              <rect x="70" y="0" width="30" height="30" fill="#212529"/>
-              <rect x="75" y="5" width="20" height="20" fill="#fff"/>
-              <rect x="80" y="10" width="10" height="10" fill="#212529"/>
-
-              <rect x="0" y="70" width="30" height="30" fill="#212529"/>
-              <rect x="5" y="75" width="20" height="20" fill="#fff"/>
-              <rect x="10" y="80" width="10" height="10" fill="#212529"/>
-
-              <rect x="36" y="10" width="8" height="8"/>
-              <rect x="48" y="15" width="8" height="8"/>
-              <rect x="40" y="35" width="20" height="8"/>
-              <rect x="45" y="50" width="12" height="12"/>
-              <rect x="70" y="45" width="10" height="10"/>
-              <rect x="85" y="60" width="10" height="10"/>
-              <rect x="35" y="75" width="12" height="12"/>
-              <rect x="55" y="80" width="15" height="15"/>
+        <!-- ETAPA 3: Sucesso / Doação Confirmada -->
+        <div id="vizionpayStepSuccess" style="display:none; text-align:center; padding: 20px 0;">
+          <div class="success-animation-circle">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </div>
-          <div style="font-size:12px; color:#555; font-weight:600;">Pague instantaneamente via Pix</div>
-          
-          <div class="pix-copy-box">
-            <input type="text" id="pixKeyInput" readonly value="00020126580014br.gov.bcb.pix0136vakinha" />
-            <button type="button" class="btn-create-campaign" id="copyPixBtn" style="padding:8px 14px; font-size:13px;">
-              Copiar
-            </button>
+          <h2 style="font-size:22px; font-weight:800; color:#0f172a; margin:16px 0 8px;">
+            Doação Confirmada com Sucesso! 🎉
+          </h2>
+          <p style="font-size:14px; color:#475569; margin:0 0 20px;">
+            Seu pagamento foi aprovado instantaneamente pelo gateway <strong>VizionPay</strong>. A vaquinha agradece de coração pelo seu apoio!
+          </p>
+
+          <div class="receipt-summary-box">
+            <div class="receipt-row">
+              <span>Valor doado:</span>
+              <strong id="receiptAmount" style="color:var(--vk-green-dark); font-size:16px;">R$ 0,00</strong>
+            </div>
+            <div class="receipt-row">
+              <span>Gateway:</span>
+              <span class="badge-instant">VizionPay D+0</span>
+            </div>
+            <div class="receipt-row">
+              <span>ID da Transação:</span>
+              <code id="receiptTxId" style="font-size:12px; color:#64748b;">VP-000000</code>
+            </div>
           </div>
+
+          <button type="button" class="btn-vizionpay-primary" id="btnFinishDonation" style="margin-top:20px;">
+            Concluir e Ver Vaquinha Atualizada
+          </button>
         </div>
 
-        <button type="button" class="btn-create-campaign" id="confirmDonationBtn" style="width:100%; justify-content:center; padding:14px; font-size:16px;">
-          Confirmar Doação (Simulação)
-        </button>
       </div>
     </div>
   </div>

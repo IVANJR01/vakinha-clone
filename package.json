@@ -15,5 +15,9 @@
     "javascript"
   ],
   "author": "Antigravity AI",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "qrcode": "^1.5.4"
+  }
 }

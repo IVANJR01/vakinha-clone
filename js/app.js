@@ -321,26 +321,107 @@ document.addEventListener('DOMContentLoaded', () => {
     detailModal.classList.add('active');
   };
 
-  // Donation Modal
+  // Estado da transação VizionPay
+  let activeVizionpayTxId = null;
+  let vizionpayPollTimer = null;
+  let vizionpayCountdownTimer = null;
+  let vizionpayCountdownSeconds = 900; // 15 minutos
+  let selectedMethod = 'pix';
+
+  // Máscaras de entrada (CPF e Telefone)
+  const formatCPF = (val) => {
+    return val
+      .replace(/\D/g, '')
+      .slice(0, 11)
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  };
+
+  const formatPhone = (val) => {
+    return val
+      .replace(/\D/g, '')
+      .slice(0, 11)
+      .replace(/^(\d{2})(\d)/g, '($1) $2')
+      .replace(/(\d{5})(\d{4})$/, '$1-$2');
+  };
+
+  const payerCpfInput = document.getElementById('payerCpf');
+  if (payerCpfInput) {
+    payerCpfInput.addEventListener('input', (e) => {
+      e.target.value = formatCPF(e.target.value);
+    });
+  }
+
+  const payerPhoneInput = document.getElementById('payerPhone');
+  if (payerPhoneInput) {
+    payerPhoneInput.addEventListener('input', (e) => {
+      e.target.value = formatPhone(e.target.value);
+    });
+  }
+
+  // Alternância de Método de Pagamento VizionPay
+  document.querySelectorAll('.payment-method-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.payment-method-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      const radio = card.querySelector('input[type="radio"]');
+      if (radio) radio.checked = true;
+      selectedMethod = card.dataset.method || 'pix';
+    });
+  });
+
+  // Atualizar preview do valor no botão
+  const updateAmountDisplays = (val) => {
+    const preview = document.getElementById('btnAmountPreview');
+    if (preview) {
+      preview.textContent = `Total: ${formatCurrency(val)}`;
+    }
+  };
+
+  // Abrir Checkout VizionPay
   window.openDonationModal = (id) => {
     const c = campaigns.find(item => item.id === id);
     if (!c) return;
     currentDonationCampaign = c;
     selectedDonationAmount = 50;
+    selectedMethod = 'pix';
 
-    document.getElementById('donationModalTitle').textContent = `Apoiar "${c.title}"`;
+    // Reseta etapas
+    document.getElementById('vizionpayStep1').style.display = 'block';
+    document.getElementById('vizionpayStepPix').style.display = 'none';
+    document.getElementById('vizionpayStepSuccess').style.display = 'none';
+
+    // Limpa timers anteriores
+    clearInterval(vizionpayPollTimer);
+    clearInterval(vizionpayCountdownTimer);
+
+    // Preenche dados da campanha no modal
+    document.getElementById('donationModalTitle').textContent = c.title;
+    const thumb = document.getElementById('donationCampaignThumb');
+    if (thumb) thumb.src = c.image;
+
+    // Reset valor
     document.getElementById('customAmountInput').value = '50';
-    updatePixCode(c, 50);
+    updateAmountDisplays(50);
 
-    // Reset preset buttons
+    // Reset presets
     document.querySelectorAll('.donation-preset-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.val === '50');
+    });
+
+    // Reset método para Pix
+    document.querySelectorAll('.payment-method-card').forEach(card => {
+      const isPix = card.dataset.method === 'pix';
+      card.classList.toggle('active', isPix);
+      const radio = card.querySelector('input[type="radio"]');
+      if (radio) radio.checked = isPix;
     });
 
     donationModal.classList.add('active');
   };
 
-  // Preset Buttons Handling
+  // Presets de Doação
   document.querySelectorAll('.donation-preset-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.donation-preset-btn').forEach(b => b.classList.remove('active'));
@@ -348,48 +429,256 @@ document.addEventListener('DOMContentLoaded', () => {
       const val = parseFloat(btn.dataset.val);
       selectedDonationAmount = val;
       document.getElementById('customAmountInput').value = val;
-      if (currentDonationCampaign) {
-        updatePixCode(currentDonationCampaign, val);
-      }
+      updateAmountDisplays(val);
     });
   });
 
-  document.getElementById('customAmountInput').addEventListener('input', (e) => {
-    document.querySelectorAll('.donation-preset-btn').forEach(b => b.classList.remove('active'));
-    const val = parseFloat(e.target.value) || 0;
-    selectedDonationAmount = val;
-    if (currentDonationCampaign && val > 0) {
-      updatePixCode(currentDonationCampaign, val);
-    }
-  });
+  const customAmountInput = document.getElementById('customAmountInput');
+  if (customAmountInput) {
+    customAmountInput.addEventListener('input', (e) => {
+      document.querySelectorAll('.donation-preset-btn').forEach(b => b.classList.remove('active'));
+      const val = parseFloat(e.target.value) || 0;
+      selectedDonationAmount = val;
+      updateAmountDisplays(val);
+    });
+  }
 
-  const updatePixCode = (c, amount) => {
-    const pixKey = `00020126580014br.gov.bcb.pix0136vakinha-${c.id}-${Date.now()}520400005303986540${amount.toFixed(2)}5802BR5925Vakinha Plataforma6009PortoAlegre62070503***6304`;
-    document.getElementById('pixKeyInput').value = pixKey;
+  // Timer Regressivo do Pix VizionPay (15 minutos)
+  const startVizionpayCountdown = () => {
+    clearInterval(vizionpayCountdownTimer);
+    vizionpayCountdownSeconds = 15 * 60;
+    const countdownEl = document.getElementById('vizionpayCountdown');
+
+    const updateTimer = () => {
+      const minutes = Math.floor(vizionpayCountdownSeconds / 60);
+      const seconds = vizionpayCountdownSeconds % 60;
+      if (countdownEl) {
+        countdownEl.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }
+      if (vizionpayCountdownSeconds <= 0) {
+        clearInterval(vizionpayCountdownTimer);
+        clearInterval(vizionpayPollTimer);
+        const statusText = document.getElementById('vizionpayStatusText');
+        if (statusText) statusText.textContent = 'Tempo expirado. Gere uma nova doação.';
+      } else {
+        vizionpayCountdownSeconds--;
+      }
+    };
+
+    updateTimer();
+    vizionpayCountdownTimer = setInterval(updateTimer, 1000);
   };
 
-  // Copy Pix Key
-  document.getElementById('copyPixBtn').addEventListener('click', () => {
-    const input = document.getElementById('pixKeyInput');
-    input.select();
-    navigator.clipboard.writeText(input.value);
-    showToast('Chave Pix Copia e Cola copiada! 💰', 'success');
-  });
+  // Polling de Status da VizionPay
+  const startStatusPolling = (txId) => {
+    clearInterval(vizionpayPollTimer);
+    vizionpayPollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/vizionpay/status/${txId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.status === 'paid') {
+          clearInterval(vizionpayPollTimer);
+          clearInterval(vizionpayCountdownTimer);
+          handleVizionpayPaymentSuccess(data);
+        }
+      } catch (err) {
+        console.warn('Erro ao consultar status VizionPay:', err);
+      }
+    }, 2500);
+  };
 
-  // Confirm Simulated Donation
-  document.getElementById('confirmDonationBtn').addEventListener('click', () => {
-    if (!currentDonationCampaign) return;
-    const amount = selectedDonationAmount > 0 ? selectedDonationAmount : 25;
-    
-    // Update live state
-    currentDonationCampaign.collectedValue += amount;
-    currentDonationCampaign.donorsCount += 1;
-    currentDonationCampaign.collectedPercentValue = (currentDonationCampaign.collectedValue / currentDonationCampaign.goal) * 100;
+  // Sucesso na Confirmação VizionPay
+  const handleVizionpayPaymentSuccess = (txData) => {
+    const amount = txData.amount || selectedDonationAmount || 50;
 
-    showToast(`Obrigado! Sua doação de ${formatCurrency(amount)} foi confirmada com sucesso! 🎉`, 'success');
-    closeAllModals();
+    // Atualiza estado da campanha localmente se não veio pelo server
+    if (currentDonationCampaign) {
+      currentDonationCampaign.collectedValue += amount;
+      currentDonationCampaign.donorsCount += 1;
+      currentDonationCampaign.collectedPercentValue = Math.min(
+        100,
+        (currentDonationCampaign.collectedValue / currentDonationCampaign.goal) * 100
+      );
+    }
+
+    // Atualiza recibo
+    const receiptAmountEl = document.getElementById('receiptAmount');
+    if (receiptAmountEl) receiptAmountEl.textContent = formatCurrency(amount);
+
+    const receiptTxEl = document.getElementById('receiptTxId');
+    if (receiptTxEl) receiptTxEl.textContent = txData.transactionId || activeVizionpayTxId || 'VP-OK';
+
+    // Transição de tela
+    document.getElementById('vizionpayStep1').style.display = 'none';
+    document.getElementById('vizionpayStepPix').style.display = 'none';
+    document.getElementById('vizionpayStepSuccess').style.display = 'block';
+
+    showToast(`Pagamento de ${formatCurrency(amount)} confirmado via VizionPay! 🎉`, 'success');
     renderGrid();
-  });
+  };
+
+  // Botão: Prosseguir para Pagamento VizionPay (Etapa 1 -> Etapa 2)
+  const btnProceedVizionpay = document.getElementById('btnProceedVizionpay');
+  if (btnProceedVizionpay) {
+    btnProceedVizionpay.addEventListener('click', async () => {
+      const amount = selectedDonationAmount > 0 ? selectedDonationAmount : 25;
+      const payerName = document.getElementById('payerName').value.trim();
+      const payerEmail = document.getElementById('payerEmail').value.trim();
+      const payerCpf = document.getElementById('payerCpf').value.trim();
+      const payerPhone = document.getElementById('payerPhone').value.trim();
+
+      if (!payerName) {
+        showToast('Por favor, informe seu nome completo.', 'error');
+        document.getElementById('payerName').focus();
+        return;
+      }
+      if (!payerCpf || payerCpf.length < 11) {
+        showToast('Por favor, informe um CPF válido.', 'error');
+        document.getElementById('payerCpf').focus();
+        return;
+      }
+      if (!payerEmail || !payerEmail.includes('@')) {
+        showToast('Por favor, informe um e-mail válido.', 'error');
+        document.getElementById('payerEmail').focus();
+        return;
+      }
+
+      // Feedback de carregamento
+      btnProceedVizionpay.disabled = true;
+      btnProceedVizionpay.querySelector('.btn-text').textContent = 'Gerando cobrança na VizionPay...';
+
+      try {
+        const response = await fetch('/api/vizionpay/create-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            campaignId: currentDonationCampaign ? currentDonationCampaign.id : null,
+            amount: amount,
+            payer: {
+              name: payerName,
+              email: payerEmail,
+              cpf: payerCpf,
+              phone: payerPhone
+            },
+            method: selectedMethod
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Falha ao comunicar com gateway VizionPay');
+        }
+
+        const data = await response.json();
+        activeVizionpayTxId = data.transactionId;
+
+        // Preenche dados da tela Pix
+        document.getElementById('vizionpayCheckoutAmount').textContent = formatCurrency(amount);
+        document.getElementById('vizionpayQrCodeImg').src = data.qrCodeDataUrl;
+        document.getElementById('pixKeyInput').value = data.pixCopiaECola;
+
+        const statusText = document.getElementById('vizionpayStatusText');
+        if (statusText) statusText.textContent = 'Aguardando pagamento no app do seu banco...';
+
+        // Alterna para tela de QR Code
+        document.getElementById('vizionpayStep1').style.display = 'none';
+        document.getElementById('vizionpayStepPix').style.display = 'block';
+
+        // Inicia cronômetro e polling
+        startVizionpayCountdown();
+        startStatusPolling(data.transactionId);
+
+        showToast('Cobrança VizionPay gerada com sucesso! Escaneie o Pix.', 'info');
+      } catch (err) {
+        console.error('Erro no checkout VizionPay:', err);
+        showToast('Erro ao gerar pagamento na VizionPay. Tente novamente.', 'error');
+      } finally {
+        btnProceedVizionpay.disabled = false;
+        btnProceedVizionpay.querySelector('.btn-text').textContent = 'Prosseguir para Pagamento VizionPay';
+      }
+    });
+  }
+
+  // Copiar Chave Pix Copia e Cola
+  const copyPixBtn = document.getElementById('copyPixBtn');
+  if (copyPixBtn) {
+    copyPixBtn.addEventListener('click', () => {
+      const input = document.getElementById('pixKeyInput');
+      input.select();
+      navigator.clipboard.writeText(input.value);
+      copyPixBtn.classList.add('copied');
+      copyPixBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span>Copiado!</span>
+      `;
+      showToast('Chave Pix Copia e Cola da VizionPay copiada! 💰', 'success');
+
+      setTimeout(() => {
+        copyPixBtn.classList.remove('copied');
+        copyPixBtn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Copiar</span>
+        `;
+      }, 3000);
+    });
+  }
+
+  // Simular Pagamento Aprovado (Demonstração / Teste Imediato da VizionPay)
+  const btnSimulateVizionpayPaid = document.getElementById('btnSimulateVizionpayPaid');
+  if (btnSimulateVizionpayPaid) {
+    btnSimulateVizionpayPaid.addEventListener('click', async () => {
+      if (!activeVizionpayTxId) return;
+
+      btnSimulateVizionpayPaid.textContent = 'Confirmando via webhook VizionPay...';
+      btnSimulateVizionpayPaid.disabled = true;
+
+      try {
+        const res = await fetch('/api/vizionpay/simulate-paid', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactionId: activeVizionpayTxId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          clearInterval(vizionpayPollTimer);
+          clearInterval(vizionpayCountdownTimer);
+          handleVizionpayPaymentSuccess({
+            transactionId: activeVizionpayTxId,
+            amount: selectedDonationAmount
+          });
+        }
+      } catch (err) {
+        showToast('Erro ao simular webhook da VizionPay', 'error');
+      } finally {
+        btnSimulateVizionpayPaid.disabled = false;
+        btnSimulateVizionpayPaid.textContent = '⚡ Simular Pagamento Instantâneo (VizionPay Test)';
+      }
+    });
+  }
+
+  // Voltar da tela de QR Code para a Etapa 1
+  const btnBackToStep1 = document.getElementById('btnBackToStep1');
+  if (btnBackToStep1) {
+    btnBackToStep1.addEventListener('click', () => {
+      clearInterval(vizionpayPollTimer);
+      clearInterval(vizionpayCountdownTimer);
+      document.getElementById('vizionpayStepPix').style.display = 'none';
+      document.getElementById('vizionpayStep1').style.display = 'block';
+    });
+  }
+
+  // Finalizar e Fechar Modal
+  const btnFinishDonation = document.getElementById('btnFinishDonation');
+  if (btnFinishDonation) {
+    btnFinishDonation.addEventListener('click', () => {
+      closeAllModals();
+    });
+  }
 
   // Create Campaign Modal
   document.getElementById('btnCreateCampaignHeader').addEventListener('click', (e) => {
@@ -456,6 +745,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Close Modals Helper
   const closeAllModals = () => {
+    clearInterval(vizionpayPollTimer);
+    clearInterval(vizionpayCountdownTimer);
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
     mobileDrawer.classList.remove('open');
     mobileOverlay.classList.remove('active');
