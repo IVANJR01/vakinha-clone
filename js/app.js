@@ -328,39 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let vizionpayCountdownSeconds = 900; // 15 minutos
   let selectedMethod = 'pix';
 
-  // Máscaras de entrada (CPF e Telefone)
-  const formatCPF = (val) => {
-    return val
-      .replace(/\D/g, '')
-      .slice(0, 11)
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-  };
-
-  const formatPhone = (val) => {
-    return val
-      .replace(/\D/g, '')
-      .slice(0, 11)
-      .replace(/^(\d{2})(\d)/g, '($1) $2')
-      .replace(/(\d{5})(\d{4})$/, '$1-$2');
-  };
-
-  const payerCpfInput = document.getElementById('payerCpf');
-  if (payerCpfInput) {
-    payerCpfInput.addEventListener('input', (e) => {
-      e.target.value = formatCPF(e.target.value);
-    });
-  }
-
-  const payerPhoneInput = document.getElementById('payerPhone');
-  if (payerPhoneInput) {
-    payerPhoneInput.addEventListener('input', (e) => {
-      e.target.value = formatPhone(e.target.value);
-    });
-  }
-
-  // Alternância de Método de Pagamento VizionPay
+  // Alternância de Método de Pagamento
   document.querySelectorAll('.payment-method-card').forEach(card => {
     card.addEventListener('click', () => {
       document.querySelectorAll('.payment-method-card').forEach(c => c.classList.remove('active'));
@@ -526,26 +494,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnProceedVizionpay) {
     btnProceedVizionpay.addEventListener('click', async () => {
       const amount = selectedDonationAmount > 0 ? selectedDonationAmount : 25;
-      const payerName = document.getElementById('payerName').value.trim();
-      const payerEmail = document.getElementById('payerEmail').value.trim();
-      const payerCpf = document.getElementById('payerCpf').value.trim();
-      const payerPhone = document.getElementById('payerPhone').value.trim();
-
-      if (!payerName) {
-        showToast('Por favor, informe seu nome completo.', 'error');
-        document.getElementById('payerName').focus();
-        return;
-      }
-      if (!payerCpf || payerCpf.length < 11) {
-        showToast('Por favor, informe um CPF válido.', 'error');
-        document.getElementById('payerCpf').focus();
-        return;
-      }
-      if (!payerEmail || !payerEmail.includes('@')) {
-        showToast('Por favor, informe um e-mail válido.', 'error');
-        document.getElementById('payerEmail').focus();
-        return;
-      }
 
       // Feedback de carregamento
       btnProceedVizionpay.disabled = true;
@@ -559,10 +507,10 @@ document.addEventListener('DOMContentLoaded', () => {
             campaignId: currentDonationCampaign ? currentDonationCampaign.id : null,
             amount: amount,
             payer: {
-              name: payerName,
-              email: payerEmail,
-              cpf: payerCpf,
-              phone: payerPhone
+              name: 'Apoiador Anônimo',
+              email: 'contato@vakinha.com.br',
+              cpf: '',
+              phone: ''
             },
             method: selectedMethod
           })
