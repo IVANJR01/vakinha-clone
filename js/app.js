@@ -770,6 +770,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   mobileOverlay.addEventListener('click', closeAllModals);
 
+  // Carregar status e dados do produtor VizionPay
+  fetch('/api/vizionpay/config')
+    .then(r => r.json())
+    .then(data => {
+      if (data.authenticated && data.producer) {
+        const badge = document.getElementById('vizionpayVerifiedSeller');
+        const nameEl = document.getElementById('vizionpayProducerName');
+        if (badge && nameEl) {
+          nameEl.textContent = data.producer.name;
+          badge.style.display = 'flex';
+        }
+      }
+    })
+    .catch(() => {});
+
   // Initial Render
   applyFilters();
 });

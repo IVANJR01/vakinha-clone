@@ -8,12 +8,57 @@ const QRCode = require('qrcode');
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = __dirname;
 
-const VIZIONPAY_API_URL = process.env.VIZIONPAY_API_URL || 'https://api.vizzionpay.com.br/v1';
+const VIZIONPAY_API_URL = process.env.VIZIONPAY_API_URL || 'https://app.vizzionpay.com.br/api/v1';
 const VIZIONPAY_API_KEY = process.env.VIZIONPAY_API_KEY || '';
 const VIZIONPAY_SECRET_KEY = process.env.VIZIONPAY_SECRET_KEY || '';
 
 // Memória de transações para o checkout
 const transactions = new Map();
+let authenticatedProducer = null;
+
+// Função para verificar status das credenciais diretamente na VizzionPay
+async function verifyVizionpayAuth() {
+  if (!VIZIONPAY_API_KEY || !VIZIONPAY_SECRET_KEY) return null;
+
+  return new Promise((resolve) => {
+    try {
+      const u = new URL(VIZIONPAY_API_URL);
+      const req = https.request({
+        hostname: u.hostname,
+        port: 443,
+        path: u.pathname || '/api/v1',
+        method: 'GET',
+        headers: {
+          'User-Agent': 'VakinhaClone/1.0',
+          'x-public-key': VIZIONPAY_API_KEY.trim(),
+          'x-secret-key': VIZIONPAY_SECRET_KEY.trim()
+        },
+        timeout: 5000
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (res.statusCode === 200 && parsed.producer) {
+              authenticatedProducer = parsed.producer;
+              resolve(parsed.producer);
+            } else {
+              resolve(null);
+            }
+          } catch {
+            resolve(null);
+          }
+        });
+      });
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+      req.end();
+    } catch {
+      resolve(null);
+    }
+  });
+}
 
 // Carregar campanhas
 let campaignsCache = null;
@@ -63,7 +108,7 @@ function computeCRC16(payload) {
 }
 
 // Gerador de Pix Copia e Cola EMV Padrão Banco Central do Brasil
-function generatePixPayload({ txId, amount, name = 'VIZIONPAY VAKINHA', city = 'SAO PAULO' }) {
+function generatePixPayload({ txId, amount, name = 'VIZIONPAY', city = 'SAO PAULO' }) {
   const cleanName = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 25);
   const cleanCity = city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 15);
   const formattedAmount = Number(amount).toFixed(2);
@@ -107,7 +152,6 @@ const MIME_TYPES = {
   '.woff2': 'font/woff2'
 };
 
-// Utilitário para parsear JSON do body
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -133,7 +177,7 @@ const server = http.createServer(async (req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-public-key, x-secret-key');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -144,14 +188,25 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
   let pathname = parsedUrl.pathname;
 
-  // Endpoint: Status da configuração VizionPay
+  // Endpoint: Configuração e Status da VizionPay
   if (pathname === '/api/vizionpay/config' && req.method === 'GET') {
+    if (!authenticatedProducer && VIZIONPAY_API_KEY && VIZIONPAY_SECRET_KEY) {
+      await verifyVizionpayAuth();
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       gateway: 'VizionPay',
       hasApiKey: Boolean(VIZIONPAY_API_KEY && VIZIONPAY_API_KEY.trim()),
       apiUrl: VIZIONPAY_API_URL,
-      mode: (VIZIONPAY_API_KEY && VIZIONPAY_API_KEY.trim()) ? 'live' : 'sandbox',
+      authenticated: Boolean(authenticatedProducer),
+      producer: authenticatedProducer ? {
+        id: authenticatedProducer.id,
+        name: authenticatedProducer.name,
+        email: authenticatedProducer.email,
+        status: authenticatedProducer.status
+      } : null,
+      mode: authenticatedProducer ? 'live' : 'sandbox',
       pixInstantEnabled: true,
       cardEnabled: true
     }));
@@ -170,34 +225,25 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const txId = `VP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutos
-
-      let pixCopiaECola = '';
-      let qrCodeDataUrl = '';
-      let liveResponse = null;
-
-      // Se houver chave configurada, tentar chamada real à API da VizionPay
-      if (VIZIONPAY_API_KEY && VIZIONPAY_API_KEY.trim()) {
-        try {
-          // Exemplo de chamada REST para gateway VizionPay
-          console.log(`[VizionPay] Enviando requisição para API oficial: ${VIZIONPAY_API_URL}`);
-          // Aqui faria a requisição HTTP POST para a API configurada
-        } catch (apiErr) {
-          console.warn('[VizionPay] Falha na chamada da API externa, utilizando fallback inteligente:', apiErr.message);
-        }
+      if (!authenticatedProducer && VIZIONPAY_API_KEY && VIZIONPAY_SECRET_KEY) {
+        await verifyVizionpayAuth();
       }
 
-      // Geração de payload Pix EMV oficial com validação CRC16
-      pixCopiaECola = generatePixPayload({
+      const txId = `VP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+      const receiverName = authenticatedProducer ? authenticatedProducer.name : 'VAKINHA VIZIONPAY';
+
+      // Gerar Pix Copia e Cola oficial BACEN
+      const pixCopiaECola = generatePixPayload({
         txId,
         amount: Number(amount),
-        name: 'VAKINHA VIZIONPAY',
+        name: receiverName,
         city: 'SAO PAULO'
       });
 
-      // Gera o QR Code visual em alta resolução via qrcode
-      qrCodeDataUrl = await QRCode.toDataURL(pixCopiaECola, {
+      // Gerar QR Code em imagem Data URL
+      const qrCodeDataUrl = await QRCode.toDataURL(pixCopiaECola, {
         errorCorrectionLevel: 'M',
         margin: 2,
         width: 320,
@@ -207,7 +253,6 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      // Armazenar transação em memória
       const transaction = {
         id: txId,
         campaignId: campaignId ? Number(campaignId) : null,
@@ -218,6 +263,10 @@ const server = http.createServer(async (req, res) => {
           cpf: payer?.cpf || '',
           phone: payer?.phone || ''
         },
+        producer: authenticatedProducer ? {
+          name: authenticatedProducer.name,
+          email: authenticatedProducer.email
+        } : null,
         method,
         status: 'pending',
         pixCopiaECola,
@@ -239,8 +288,9 @@ const server = http.createServer(async (req, res) => {
         pixCopiaECola,
         qrCodeDataUrl,
         expiresAt,
+        receiverName,
         gateway: 'VizionPay',
-        mode: (VIZIONPAY_API_KEY && VIZIONPAY_API_KEY.trim()) ? 'live' : 'sandbox'
+        mode: authenticatedProducer ? 'live' : 'sandbox'
       }));
       return;
     } catch (err) {
@@ -274,7 +324,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Endpoint: Simular confirmação imediata (webhook simulado para testes rápidos)
+  // Endpoint: Simular confirmação imediata (para testes locais rápidos)
   if (pathname === '/api/vizionpay/simulate-paid' && req.method === 'POST') {
     try {
       const data = await readJsonBody(req);
@@ -291,7 +341,6 @@ const server = http.createServer(async (req, res) => {
         tx.status = 'paid';
         tx.paidAt = new Date().toISOString();
 
-        // Atualizar saldo da vaquinha associada
         if (tx.campaignId) {
           const camps = getCampaigns();
           const campaign = camps.find(c => c.id === tx.campaignId);
@@ -327,7 +376,6 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       console.log('[VizionPay Webhook recebido]:', body);
 
-      // Tratamento genérico de eventos VizionPay (ex: status: "paid" / "approved")
       const txId = body.transactionId || body.id || body?.data?.id || body?.data?.transactionId;
       const status = (body.status || body?.data?.status || body.event || '').toLowerCase();
 
@@ -406,10 +454,17 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`\n==================================================`);
-  console.log(`🚀 Clone do Vakinha rodando com sucesso!`);
-  console.log(`💳 Gateway VizionPay integrado e ativo!`);
-  console.log(`👉 Acesse no navegador: http://localhost:${PORT}`);
-  console.log(`==================================================\n`);
+// Inicialização com verificação das credenciais
+verifyVizionpayAuth().then((producer) => {
+  server.listen(PORT, () => {
+    console.log(`\n==================================================`);
+    console.log(`🚀 Clone do Vakinha rodando com sucesso!`);
+    console.log(`💳 Gateway VizionPay: ${producer ? 'CONECTADO & AUTENTICADO' : 'MODO TESTE'}`);
+    if (producer) {
+      console.log(`👤 Produtor: ${producer.name} (${producer.email})`);
+      console.log(`⚡ Status da Conta: ${producer.status}`);
+    }
+    console.log(`👉 Acesse no navegador: http://localhost:${PORT}`);
+    console.log(`==================================================\n`);
+  });
 });
