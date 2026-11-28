@@ -381,13 +381,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const thumb = document.getElementById('donationCampaignThumb');
     if (thumb) thumb.src = c.image;
 
-    // Reset valor
-    document.getElementById('customAmountInput').value = '50';
-    updateAmountDisplays(50);
+    // Reset valor padrão (R$ 25)
+    selectedDonationAmount = 25;
+    document.getElementById('customAmountInput').value = '25';
+    updateAmountDisplays(25);
 
     // Reset presets
     document.querySelectorAll('.donation-preset-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.val === '50');
+      btn.classList.toggle('active', btn.dataset.val === '25');
     });
 
     // Reset método para Pix
@@ -419,6 +420,13 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.donation-preset-btn').forEach(b => b.classList.remove('active'));
       const val = parseFloat(e.target.value) || 0;
       selectedDonationAmount = val;
+      
+      // Destaca o preset caso o valor digitado coincida
+      document.querySelectorAll('.donation-preset-btn').forEach(b => {
+        if (parseFloat(b.dataset.val) === val) {
+          b.classList.add('active');
+        }
+      });
       updateAmountDisplays(val);
     });
   }
@@ -505,7 +513,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnProceedVizionpay = document.getElementById('btnProceedVizionpay');
   if (btnProceedVizionpay) {
     btnProceedVizionpay.addEventListener('click', async () => {
-      const amount = selectedDonationAmount > 0 ? selectedDonationAmount : 25;
+      let amount = selectedDonationAmount > 0 ? selectedDonationAmount : 25;
+
+      if (amount < 5) {
+        showToast('O valor mínimo para doação é de R$ 5,00', 'warning');
+        selectedDonationAmount = 5;
+        document.getElementById('customAmountInput').value = '5';
+        updateAmountDisplays(5);
+        document.querySelectorAll('.donation-preset-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === '5');
+        });
+        return;
+      }
 
       // Feedback de carregamento
       btnProceedVizionpay.disabled = true;

@@ -726,30 +726,40 @@ body {
 /* Preset Donation Options */
 .donation-presets {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin: 16px 0;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 14px 0 16px;
+}
+
+@media (min-width: 480px) {
+  .donation-presets {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
 }
 
 .donation-preset-btn {
-  padding: 12px 6px;
-  border: 1px solid #ddd;
+  padding: 10px 4px;
+  border: 1.5px solid #e2e8f0;
   background: #fff;
-  border-radius: 10px;
+  border-radius: 8px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
+  color: #1e293b;
   cursor: pointer;
   transition: all 0.2s;
   text-align: center;
+  white-space: nowrap;
 }
 .donation-preset-btn:hover {
-  border-color: var(--vk-green);
-  background: var(--vk-green-light);
+  border-color: #24ca68;
+  background: #f0fdf4;
 }
 .donation-preset-btn.active {
-  border-color: var(--vk-green-dark);
-  background: var(--vk-green-light);
-  color: var(--vk-green-dark);
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #047857;
+  box-shadow: 0 1px 4px rgba(16, 185, 129, 0.2);
 }
 
 .pix-qr-box {
