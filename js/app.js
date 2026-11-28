@@ -314,8 +314,20 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     document.getElementById('detailModalShareBtn').onclick = () => {
-      navigator.clipboard.writeText(`https://www.vakinha.com.br/${c.id}`);
-      showToast('Link da vaquinha copiado para a área de transferência! 📋', 'success');
+      const shareUrl = `${window.location.origin}${window.location.pathname}?v=${c.id}`;
+      if (navigator.share) {
+        navigator.share({
+          title: c.title,
+          text: `Ajude nesta causa: ${c.title}`,
+          url: shareUrl
+        }).catch(() => {
+          navigator.clipboard.writeText(shareUrl);
+          showToast('Link da vaquinha copiado com sucesso! 📋', 'success');
+        });
+      } else {
+        navigator.clipboard.writeText(shareUrl);
+        showToast('Link da vaquinha copiado com sucesso! 📋', 'success');
+      }
     };
 
     detailModal.classList.add('active');
@@ -723,4 +735,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initial Render
   applyFilters();
+
+  // Abrir vaquinha automaticamente se o link contiver o parâmetro ?v=ID
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedId = urlParams.get('v') || urlParams.get('campanha');
+    if (sharedId) {
+      const campIdNum = parseInt(sharedId, 10);
+      if (!isNaN(campIdNum)) {
+        setTimeout(() => {
+          window.openDetailModal(campIdNum);
+        }, 300);
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao processar URL de compartilhamento:', e);
+  }
 });
