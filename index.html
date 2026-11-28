@@ -271,11 +271,11 @@
 
           <!-- Métodos de Pagamento -->
           <div class="checkout-section">
-            <label class="checkout-label">2. Escolha como pagar:</label>
+            <label class="checkout-label">2. Forma de pagamento:</label>
             <div class="payment-methods-grid">
-              <label class="payment-method-card active" data-method="pix">
-                <input type="radio" name="paymentMethod" value="pix" checked />
-                <div class="method-icon-wrap">
+              <div class="payment-method-card active" data-method="pix" style="cursor: default;">
+                <input type="radio" name="paymentMethod" value="pix" checked disabled style="display:none;" />
+                <div class="method-icon-wrap" style="background: #dcfce7;">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="#00bdae">
                     <path d="M12.001 2.25L4.5 9.75l7.501 7.5 7.499-7.5-7.499-7.5zm-5.303 7.5l5.303-5.304 5.303 5.304-5.303 5.303-5.303-5.303z"/>
                     <path d="M12.001 17.25L7.5 21.75h9.002l-4.501-4.5z"/>
@@ -288,30 +288,16 @@
                   </div>
                   <span class="method-sub">Aprovação em segundos via QR Code ou Copia e Cola</span>
                 </div>
-              </label>
-
-              <label class="payment-method-card" data-method="credit_card">
-                <input type="radio" name="paymentMethod" value="credit_card" />
-                <div class="method-icon-wrap">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-                    <line x1="2" y1="10" x2="22" y2="10"></line>
-                  </svg>
+                <div style="color: #10b981; font-weight: 700; font-size: 16px; margin-left: auto;">
+                  ✓
                 </div>
-                <div class="method-details">
-                  <div class="method-title-row">
-                    <strong>Cartão de Crédito</strong>
-                    <span class="badge-neutral">Até 12x</span>
-                  </div>
-                  <span class="method-sub">Visa, Mastercard, Elo, Hipercard</span>
-                </div>
-              </label>
+              </div>
             </div>
           </div>
 
           <!-- Botão de Ação -->
           <button type="button" class="btn-vizionpay-primary" id="btnProceedVizionpay">
-            <span class="btn-text">Continuar para Doação</span>
+            <span class="btn-text">Continuar para Doação Pix</span>
             <span class="btn-subtext" id="btnAmountPreview">Total: R$ 50,00</span>
           </button>
 
@@ -390,7 +376,7 @@
                 ⚡ Confirmar Pagamento Instantâneo (Simulação de Teste)
               </button>
               <button type="button" class="btn-vizionpay-back" id="btnBackToStep1">
-                ← Alterar valor ou dados
+                ← Alterar valor da doação
               </button>
             </div>
           </div>
