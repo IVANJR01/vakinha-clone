@@ -12,9 +12,103 @@ const VIZIONPAY_API_URL = process.env.VIZIONPAY_API_URL || 'https://app.vizzionp
 const VIZIONPAY_API_KEY = process.env.VIZIONPAY_API_KEY || '';
 const VIZIONPAY_SECRET_KEY = process.env.VIZIONPAY_SECRET_KEY || '';
 
+const PIX_KEY = process.env.PIX_KEY || 'ivanjr.tstconsultoria@gmail.com';
+const PIX_RECEIVER_NAME = process.env.PIX_RECEIVER_NAME || 'VAKINHA ONLINE';
+const PIX_CITY = process.env.PIX_CITY || 'SAO PAULO';
+
 // Memória de transações para o checkout
 const transactions = new Map();
 let authenticatedProducer = null;
+
+// Gerador de CPF válido para APIs de pagamento
+function generateValidCPF() {
+  const rnd = (n) => Math.floor(Math.random() * n);
+  const mod = (base, div) => base - Math.floor(base / div) * div;
+  const n = Array(9).fill(0).map(() => rnd(9));
+  let d1 = n.reduce((total, num, i) => total + (num * (10 - i)), 0);
+  d1 = 11 - mod(d1, 11);
+  if (d1 >= 10) d1 = 0;
+  let d2 = [...n, d1].reduce((total, num, i) => total + (num * (11 - i)), 0);
+  d2 = 11 - mod(d2, 11);
+  if (d2 >= 10) d2 = 0;
+  return [...n, d1, d2].join('');
+}
+
+// Criar cobrança Pix na API VizzionPay
+async function createVizionpayPixCharge({ amount, identifier, payer }) {
+  if (!VIZIONPAY_API_KEY || !VIZIONPAY_SECRET_KEY) return null;
+
+  return new Promise((resolve) => {
+    try {
+      const u = new URL(VIZIONPAY_API_URL);
+      const postData = JSON.stringify({
+        identifier: identifier,
+        amount: Number(amount),
+        client: {
+          name: payer?.name || (authenticatedProducer ? authenticatedProducer.name : "Apoiador Vakinha"),
+          email: payer?.email || (authenticatedProducer ? authenticatedProducer.email : "doador@vakinha.com.br"),
+          phone: payer?.phone || "11987654321",
+          document: (payer?.cpf && payer.cpf.replace(/\D/g, '').length === 11) ? payer.cpf.replace(/\D/g, '') : generateValidCPF()
+        },
+        products: [
+          {
+            id: `vakinha-${identifier}`,
+            name: "Doacao Vakinha Online",
+            quantity: 1,
+            price: Number(amount)
+          }
+        ],
+        dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+
+      const req = https.request({
+        hostname: u.hostname,
+        port: 443,
+        path: '/api/v1/gateway/pix/receive',
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Content-Type': 'application/json',
+          'x-public-key': VIZIONPAY_API_KEY.trim(),
+          'x-secret-key': VIZIONPAY_SECRET_KEY.trim(),
+          'Content-Length': Buffer.byteLength(postData)
+        },
+        timeout: 8000
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (res.statusCode === 200 && parsed.pix && parsed.pix.code) {
+              console.log('✅ Cobrança Pix gerada na VizzionPay com sucesso!');
+              resolve(parsed.pix);
+            } else {
+              console.warn('⚠️ VizzionPay API (código ' + res.statusCode + '):', parsed.message || parsed.errorCode || data);
+              resolve(null);
+            }
+          } catch {
+            resolve(null);
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        console.warn('Erro ao conectar na VizzionPay API:', err.message);
+        resolve(null);
+      });
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(null);
+      });
+      req.write(postData);
+      req.end();
+    } catch (err) {
+      console.warn('Exceção ao chamar VizzionPay API:', err.message);
+      resolve(null);
+    }
+  });
+}
 
 // Função para verificar status das credenciais diretamente na VizzionPay
 async function verifyVizionpayAuth() {
@@ -108,9 +202,10 @@ function computeCRC16(payload) {
 }
 
 // Gerador de Pix Copia e Cola EMV Padrão Banco Central do Brasil
-function generatePixPayload({ txId, amount, name = 'VIZIONPAY', city = 'SAO PAULO' }) {
-  const cleanName = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 25);
-  const cleanCity = city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 15);
+function generatePixPayload({ key = PIX_KEY, amount, name = PIX_RECEIVER_NAME, city = PIX_CITY, txId = '***' }) {
+  const cleanName = (name || 'VAKINHA').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 25);
+  const cleanCity = (city || 'SAO PAULO').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 15);
+  const cleanKey = (key || 'ivanjr.tstconsultoria@gmail.com').trim();
   const formattedAmount = Number(amount).toFixed(2);
 
   const formatField = (id, val) => {
@@ -119,15 +214,15 @@ function generatePixPayload({ txId, amount, name = 'VIZIONPAY', city = 'SAO PAUL
   };
 
   const gui = formatField('00', 'br.gov.bcb.pix');
-  const key = formatField('01', 'pix@vizzionpay.com.br');
-  const merchantAccountInfo = formatField('26', `${gui}${key}`);
+  const pixKeyField = formatField('01', cleanKey);
+  const merchantAccountInfo = formatField('26', `${gui}${pixKeyField}`);
 
   const mcc = formatField('52', '0000');
   const currency = formatField('53', '986'); // BRL
   const amt = formatField('54', formattedAmount);
   const country = formatField('58', 'BR');
-  const merName = formatField('59', cleanName || 'VIZIONPAY');
-  const merCity = formatField('60', cleanCity || 'SAO PAULO');
+  const merName = formatField('59', cleanName);
+  const merCity = formatField('60', cleanCity);
 
   const addTxId = formatField('05', txId.slice(0, 25));
   const additionalDataField = formatField('62', addTxId);
@@ -232,26 +327,51 @@ const server = http.createServer(async (req, res) => {
       const txId = `VP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-      const receiverName = 'VAKINHA ONLINE';
+      let pixCopiaECola = null;
+      let qrCodeDataUrl = null;
+      let isLiveVizionpay = false;
 
-      // Gerar Pix Copia e Cola oficial BACEN
-      const pixCopiaECola = generatePixPayload({
-        txId,
+      // 1. Tentar gerar Pix oficial direto pela API da VizzionPay
+      const vizionPix = await createVizionpayPixCharge({
         amount: Number(amount),
-        name: receiverName,
-        city: 'SAO PAULO'
+        identifier: txId,
+        payer
       });
 
-      // Gerar QR Code em imagem Data URL
-      const qrCodeDataUrl = await QRCode.toDataURL(pixCopiaECola, {
-        errorCorrectionLevel: 'M',
-        margin: 2,
-        width: 320,
-        color: {
-          dark: '#0f172a',
-          light: '#ffffff'
+      if (vizionPix && vizionPix.code) {
+        pixCopiaECola = vizionPix.code;
+        isLiveVizionpay = true;
+        if (vizionPix.image) {
+          qrCodeDataUrl = vizionPix.image;
+        } else {
+          qrCodeDataUrl = await QRCode.toDataURL(pixCopiaECola, {
+            errorCorrectionLevel: 'M',
+            margin: 2,
+            width: 320,
+            color: { dark: '#0f172a', light: '#ffffff' }
+          });
         }
-      });
+      } else {
+        // 2. Fallback: Gerar Pix EMV Padrão BACEN Oficial usando a Chave Pix configurada
+        const targetKey = process.env.PIX_KEY || (authenticatedProducer ? authenticatedProducer.email : 'ivanjr.tstconsultoria@gmail.com');
+        pixCopiaECola = generatePixPayload({
+          key: targetKey,
+          amount: Number(amount),
+          name: PIX_RECEIVER_NAME,
+          city: PIX_CITY,
+          txId: '***'
+        });
+
+        qrCodeDataUrl = await QRCode.toDataURL(pixCopiaECola, {
+          errorCorrectionLevel: 'M',
+          margin: 2,
+          width: 320,
+          color: {
+            dark: '#0f172a',
+            light: '#ffffff'
+          }
+        });
+      }
 
       const transaction = {
         id: txId,
@@ -288,7 +408,7 @@ const server = http.createServer(async (req, res) => {
         pixCopiaECola,
         qrCodeDataUrl,
         expiresAt,
-        receiverName,
+        receiverName: PIX_RECEIVER_NAME,
         gateway: 'VizionPay',
         mode: authenticatedProducer ? 'live' : 'sandbox'
       }));
