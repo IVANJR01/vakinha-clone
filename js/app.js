@@ -591,39 +591,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Simular Pagamento Aprovado
-  const btnSimulateVizionpayPaid = document.getElementById('btnSimulateVizionpayPaid');
-  if (btnSimulateVizionpayPaid) {
-    btnSimulateVizionpayPaid.addEventListener('click', async () => {
-      if (!activeVizionpayTxId) return;
-
-      btnSimulateVizionpayPaid.textContent = 'Confirmando pagamento...';
-      btnSimulateVizionpayPaid.disabled = true;
-
-      try {
-        const res = await fetch('/api/vizionpay/simulate-paid', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transactionId: activeVizionpayTxId })
-        });
-        const data = await res.json();
-        if (data.success) {
-          clearInterval(vizionpayPollTimer);
-          clearInterval(vizionpayCountdownTimer);
-          handleVizionpayPaymentSuccess({
-            transactionId: activeVizionpayTxId,
-            amount: selectedDonationAmount
-          });
-        }
-      } catch (err) {
-        showToast('Erro ao confirmar pagamento', 'error');
-      } finally {
-        btnSimulateVizionpayPaid.disabled = false;
-        btnSimulateVizionpayPaid.textContent = '⚡ Confirmar Pagamento Instantâneo (Simulação de Teste)';
-      }
-    });
-  }
-
   // Voltar da tela de QR Code para a Etapa 1
   const btnBackToStep1 = document.getElementById('btnBackToStep1');
   if (btnBackToStep1) {
