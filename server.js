@@ -232,7 +232,7 @@ const server = http.createServer(async (req, res) => {
       const txId = `VP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-      const receiverName = authenticatedProducer ? authenticatedProducer.name : 'VAKINHA VIZIONPAY';
+      const receiverName = 'VAKINHA ONLINE';
 
       // Gerar Pix Copia e Cola oficial BACEN
       const pixCopiaECola = generatePixPayload({

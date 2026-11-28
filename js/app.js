@@ -488,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 2500);
   };
 
-  // Sucesso na Confirmação VizionPay
+  // Sucesso na Confirmação
   const handleVizionpayPaymentSuccess = (txData) => {
     const amount = txData.amount || selectedDonationAmount || 50;
 
@@ -507,18 +507,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (receiptAmountEl) receiptAmountEl.textContent = formatCurrency(amount);
 
     const receiptTxEl = document.getElementById('receiptTxId');
-    if (receiptTxEl) receiptTxEl.textContent = txData.transactionId || activeVizionpayTxId || 'VP-OK';
+    if (receiptTxEl) {
+      const rawId = txData.transactionId || activeVizionpayTxId || '000000';
+      receiptTxEl.textContent = `VK-${rawId.replace(/^VP-/, '')}`;
+    }
 
     // Transição de tela
     document.getElementById('vizionpayStep1').style.display = 'none';
     document.getElementById('vizionpayStepPix').style.display = 'none';
     document.getElementById('vizionpayStepSuccess').style.display = 'block';
 
-    showToast(`Pagamento de ${formatCurrency(amount)} confirmado via VizionPay! 🎉`, 'success');
+    showToast(`Doação de ${formatCurrency(amount)} confirmada com sucesso! 🎉`, 'success');
     renderGrid();
   };
 
-  // Botão: Prosseguir para Pagamento VizionPay (Etapa 1 -> Etapa 2)
+  // Botão: Continuar para Doação (Etapa 1 -> Etapa 2)
   const btnProceedVizionpay = document.getElementById('btnProceedVizionpay');
   if (btnProceedVizionpay) {
     btnProceedVizionpay.addEventListener('click', async () => {
@@ -546,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Feedback de carregamento
       btnProceedVizionpay.disabled = true;
-      btnProceedVizionpay.querySelector('.btn-text').textContent = 'Gerando cobrança na VizionPay...';
+      btnProceedVizionpay.querySelector('.btn-text').textContent = 'Gerando código Pix...';
 
       try {
         const response = await fetch('/api/vizionpay/create-payment', {
@@ -566,7 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (!response.ok) {
-          throw new Error('Falha ao comunicar com gateway VizionPay');
+          throw new Error('Falha ao processar pagamento');
         }
 
         const data = await response.json();
@@ -588,13 +591,13 @@ document.addEventListener('DOMContentLoaded', () => {
         startVizionpayCountdown();
         startStatusPolling(data.transactionId);
 
-        showToast('Cobrança VizionPay gerada com sucesso! Escaneie o Pix.', 'info');
+        showToast('Código Pix gerado com sucesso! Escaneie o QR Code.', 'info');
       } catch (err) {
-        console.error('Erro no checkout VizionPay:', err);
-        showToast('Erro ao gerar pagamento na VizionPay. Tente novamente.', 'error');
+        console.error('Erro no checkout:', err);
+        showToast('Erro ao gerar código Pix. Tente novamente.', 'error');
       } finally {
         btnProceedVizionpay.disabled = false;
-        btnProceedVizionpay.querySelector('.btn-text').textContent = 'Prosseguir para Pagamento VizionPay';
+        btnProceedVizionpay.querySelector('.btn-text').textContent = 'Continuar para Doação';
       }
     });
   }
@@ -613,7 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </svg>
         <span>Copiado!</span>
       `;
-      showToast('Chave Pix Copia e Cola da VizionPay copiada! 💰', 'success');
+      showToast('Chave Pix Copia e Cola copiada! 💰', 'success');
 
       setTimeout(() => {
         copyPixBtn.classList.remove('copied');
@@ -628,13 +631,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Simular Pagamento Aprovado (Demonstração / Teste Imediato da VizionPay)
+  // Simular Pagamento Aprovado
   const btnSimulateVizionpayPaid = document.getElementById('btnSimulateVizionpayPaid');
   if (btnSimulateVizionpayPaid) {
     btnSimulateVizionpayPaid.addEventListener('click', async () => {
       if (!activeVizionpayTxId) return;
 
-      btnSimulateVizionpayPaid.textContent = 'Confirmando via webhook VizionPay...';
+      btnSimulateVizionpayPaid.textContent = 'Confirmando pagamento...';
       btnSimulateVizionpayPaid.disabled = true;
 
       try {
@@ -653,10 +656,10 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
       } catch (err) {
-        showToast('Erro ao simular webhook da VizionPay', 'error');
+        showToast('Erro ao confirmar pagamento', 'error');
       } finally {
         btnSimulateVizionpayPaid.disabled = false;
-        btnSimulateVizionpayPaid.textContent = '⚡ Simular Pagamento Instantâneo (VizionPay Test)';
+        btnSimulateVizionpayPaid.textContent = '⚡ Confirmar Pagamento Instantâneo (Simulação de Teste)';
       }
     });
   }
@@ -769,21 +772,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   mobileOverlay.addEventListener('click', closeAllModals);
-
-  // Carregar status e dados do produtor VizionPay
-  fetch('/api/vizionpay/config')
-    .then(r => r.json())
-    .then(data => {
-      if (data.authenticated && data.producer) {
-        const badge = document.getElementById('vizionpayVerifiedSeller');
-        const nameEl = document.getElementById('vizionpayProducerName');
-        if (badge && nameEl) {
-          nameEl.textContent = data.producer.name;
-          badge.style.display = 'flex';
-        }
-      }
-    })
-    .catch(() => {});
 
   // Initial Render
   applyFilters();
